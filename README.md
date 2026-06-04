@@ -1,8 +1,10 @@
-# DVA Serverless Project
+# AWS Serverless Event Registration System
 
-Project này xây dựng một hệ thống đăng ký sự kiện theo kiến trúc serverless trên AWS. Người dùng điền form ở frontend, request được gửi qua API Gateway đến Lambda, dữ liệu được lưu vào DynamoDB, sau đó message được đẩy vào SQS để Lambda thứ hai xử lý gửi email cho user qua SES và thông báo cho admin qua SNS.
+This project demonstrates a fully serverless event registration workflow on AWS. A user submits a registration form from a static frontend hosted on AWS Amplify. The request is handled by API Gateway and Lambda, stored in DynamoDB, processed asynchronously with SQS, and then completed by sending email notifications through SES and SNS.
 
-## Kiến Trúc
+The project was originally built as an AWS Console based learning lab and can be extended later with Infrastructure as Code using AWS SAM, CDK, or Terraform.
+
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -19,184 +21,197 @@ flowchart LR
     SNS --> Admin[Admin Email]
 ```
 
-## AWS Services Sử Dụng
+## Features
 
-- **AWS Amplify**: host frontend đăng ký sự kiện.
-- **API Gateway**: tạo REST API endpoint `/register`.
-- **Lambda Registration**: validate request, ghi dữ liệu vào DynamoDB và gửi message vào SQS.
-- **DynamoDB**: lưu thông tin đăng ký.
-- **SQS**: queue trung gian cho luồng gửi email.
-- **Lambda Email Sender**: đọc message từ SQS, gửi email, publish SNS và cập nhật trạng thái.
-- **SES**: gửi email xác nhận cho user.
-- **SNS**: gửi thông báo đăng ký mới cho admin.
-- **IAM**: phân quyền cho các Lambda function.
-- **GitHub**: lưu source frontend để Amplify deploy.
+- Static frontend hosted on AWS Amplify.
+- REST API endpoint built with Amazon API Gateway.
+- Serverless backend using AWS Lambda.
+- Input validation for registration data.
+- DynamoDB table for storing registration records.
+- Asynchronous email processing with Amazon SQS.
+- Email confirmation to users through Amazon SES.
+- Admin notification through Amazon SNS.
+- DynamoDB status update after email processing.
+- IAM roles and policies scoped per Lambda function.
+- Cleanup guide to avoid unnecessary AWS costs.
 
-## Resource Naming
+## Tech Stack
+
+- **Frontend**: HTML, CSS, JavaScript, AWS Amplify
+- **Backend**: AWS Lambda, Python 3.13
+- **API**: Amazon API Gateway REST API
+- **Database**: Amazon DynamoDB
+- **Messaging**: Amazon SQS, Amazon SNS
+- **Email**: Amazon SES
+- **Security**: AWS IAM
+- **Monitoring**: Amazon CloudWatch Logs
+
+## Repository Structure
+
+```text
+aws-serverless-event-registration/
+├── frontend/
+│   └── index.html
+├── lambdas/
+│   ├── registration/
+│   │   └── lambda_function.py
+│   └── email-sender/
+│       └── lambda_function.py
+├── docs/
+│   ├── architecture.png
+│   └── screenshots/
+├── amplify.yml
+├── README.md
+└── .gitignore
+```
+
+## How It Works
+
+1. The user opens the Amplify-hosted frontend.
+2. The user submits first name, last name, and email.
+3. The frontend sends a `POST` request to API Gateway at `/register`.
+4. API Gateway invokes the Registration Lambda.
+5. The Registration Lambda validates the request body.
+6. The Lambda creates a registration ID and stores the item in DynamoDB with status `QUEUED`.
+7. The Lambda sends the registration payload to SQS.
+8. SQS triggers the Email Sender Lambda.
+9. The Email Sender Lambda sends a confirmation email to the user using SES.
+10. The Lambda publishes an admin notification to SNS.
+11. The Lambda updates the DynamoDB record status to `SENT`.
+
+## AWS Resources
 
 | Resource | Name |
 |---|---|
 | DynamoDB table | `d-dva-ddb-registration` |
 | SQS queue | `d-dva-sqs-email` |
 | SNS topic | `d-dva-sns-notification` |
-| Lambda registration | `d-dva-lambda-registration` |
-| Lambda sender | `d-dva-lambda-sender` |
+| Registration Lambda | `d-dva-lambda-registration` |
+| Email Sender Lambda | `d-dva-lambda-sender` |
 | API Gateway | `d-dva-apigw-registration` |
-| IAM policy registration | `d-dva-policy-for-lambda-registration` |
-| IAM role registration | `d-dva-role-for-lambda-registration` |
-| IAM policy sender | `d-dva-policy-for-lambda-sender` |
-| IAM role sender | `d-dva-role-for-lambda-sender` |
+| Registration IAM policy | `d-dva-policy-for-lambda-registration` |
+| Registration IAM role | `d-dva-role-for-lambda-registration` |
+| Sender IAM policy | `d-dva-policy-for-lambda-sender` |
+| Sender IAM role | `d-dva-role-for-lambda-sender` |
 | Frontend repository | `dva-serverless-project-frontend` |
 
-Region mặc định trong workbook là `us-east-1`.
-
-## Luồng Xử Lý
-
-1. User submit form đăng ký từ frontend.
-2. Frontend gọi API Gateway endpoint `/register`.
-3. API Gateway chuyển request đến `d-dva-lambda-registration`.
-4. Lambda Registration validate các field `first_name`, `last_name`, `email`.
-5. Lambda tạo `id`, set trạng thái ban đầu là `QUEUED`, ghi item vào DynamoDB.
-6. Lambda gửi message chứa thông tin đăng ký vào SQS.
-7. SQS trigger `d-dva-lambda-sender`.
-8. Lambda Email Sender gửi email xác nhận cho user qua SES.
-9. Lambda publish thông báo đăng ký mới đến SNS topic cho admin.
-10. Lambda cập nhật trạng thái record trong DynamoDB thành `SENT`.
-
-## Prerequisites
-
-- AWS account.
-- Quyền tạo IAM Role, IAM Policy, Lambda, API Gateway, DynamoDB, SQS, SNS, SES và Amplify.
-- Domain hoặc email đã verify trong SES.
-- GitHub account để lưu frontend source.
-- AWS region: `us-east-1`.
-
-Nếu SES đang ở Sandbox mode, email người nhận cũng phải được verify. Có thể dùng `success@simulator.amazonses.com` để test.
-
-## Cấu Trúc Project Đề Xuất
+Default region used in the lab:
 
 ```text
-dva-serverless-project/
-├── frontend/
-│   └── index.html
-├── lambda-registration/
-│   └── lambda_function.py
-├── lambda-sender/
-│   └── lambda_function.py
-├── amplify.yml
-└── README.md
+us-east-1
 ```
 
 ## Environment Variables
 
-### Lambda Registration
+### Registration Lambda
 
-| Key | Value |
-|---|---|
-| `TABLE_NAME` | `d-dva-ddb-registration` |
-| `QUEUE_URL` | Full SQS queue URL |
-| `CORS_ORIGIN` | Frontend domain, hoặc `*` khi demo |
-| `LOG_LEVEL` | `INFO` |
+| Key | Description | Example |
+|---|---|---|
+| `TABLE_NAME` | DynamoDB table name | `d-dva-ddb-registration` |
+| `QUEUE_URL` | SQS queue URL | `https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/d-dva-sqs-email` |
+| `CORS_ORIGIN` | Allowed frontend origin | `*` for demo |
+| `LOG_LEVEL` | Logging level | `INFO` |
 
-Ví dụ `QUEUE_URL`:
+### Email Sender Lambda
 
-```text
-https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/d-dva-sqs-email
-```
-
-### Lambda Email Sender
-
-| Key | Value |
-|---|---|
-| `TABLE_NAME` | `d-dva-ddb-registration` |
-| `TOPIC_ARN` | SNS topic ARN |
-| `SES_SENDER` | Verified SES sender |
-| `LOG_LEVEL` | `INFO` |
-
-Ví dụ:
-
-```text
-TOPIC_ARN=arn:aws:sns:us-east-1:<ACCOUNT_ID>:d-dva-sns-notification
-SES_SENDER=DVA Registration <no-reply@yourdomain.com>
-```
+| Key | Description | Example |
+|---|---|---|
+| `TABLE_NAME` | DynamoDB table name | `d-dva-ddb-registration` |
+| `TOPIC_ARN` | SNS topic ARN | `arn:aws:sns:us-east-1:<ACCOUNT_ID>:d-dva-sns-notification` |
+| `SES_SENDER` | Verified SES sender | `DVA Registration <no-reply@yourdomain.com>` |
+| `LOG_LEVEL` | Logging level | `INFO` |
 
 ### Amplify
 
-| Key | Value |
+| Key | Description |
 |---|---|
-| `API_URL` | API Gateway invoke URL của endpoint `/register` |
+| `API_URL` | API Gateway invoke URL for the `/register` endpoint |
 
-## Triển Khai
+## Deployment Guide
 
-### 1. Tạo IAM Role Cho Lambda Registration
+### 1. Create IAM for the Registration Lambda
 
-Tạo IAM policy cho phép:
+Create an IAM policy that allows the Registration Lambda to:
 
-- `dynamodb:PutItem` vào table `d-dva-ddb-registration`.
-- `sqs:SendMessage` vào queue `d-dva-sqs-email`.
-- Ghi log CloudWatch với `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`.
+- Put items into the DynamoDB table.
+- Send messages to the SQS queue.
+- Write logs to CloudWatch.
 
-Sau đó tạo role `d-dva-role-for-lambda-registration` và attach policy này.
+Attach the policy to the IAM role:
 
-### 2. Tạo IAM Role Cho Lambda Email Sender
+```text
+d-dva-role-for-lambda-registration
+```
 
-Tạo IAM policy cho phép:
+### 2. Create IAM for the Email Sender Lambda
 
-- Đọc và xóa message từ SQS.
-- Gửi email qua SES.
-- Publish message vào SNS.
-- Update item trong DynamoDB.
-- Ghi log CloudWatch.
+Create an IAM policy that allows the Email Sender Lambda to:
 
-Sau đó tạo role `d-dva-role-for-lambda-sender` và attach policy này.
+- Receive, delete, and manage messages from SQS.
+- Send emails through SES.
+- Publish messages to SNS.
+- Update items in DynamoDB.
+- Write logs to CloudWatch.
 
-### 3. Tạo DynamoDB
+Attach the policy to the IAM role:
 
-Tạo table:
+```text
+d-dva-role-for-lambda-sender
+```
 
-- Table name: `d-dva-ddb-registration`
-- Partition key: `id`
-- Type: `String`
+### 3. Create DynamoDB Table
 
-### 4. Cấu Hình SES
+Create a DynamoDB table with the following settings:
 
-Tạo SES identity cho domain hoặc email address. Nếu dùng domain, cần cấu hình DNS record theo hướng dẫn của SES.
+```text
+Table name: d-dva-ddb-registration
+Partition key: id
+Partition key type: String
+```
 
-Lưu ý: khi SES còn ở Sandbox mode, cả sender và recipient đều cần được verify.
+### 4. Configure SES
 
-### 5. Tạo SNS
+Create an SES identity for either:
 
-Tạo SNS topic:
+- A domain, or
+- An email address.
+
+If SES is still in Sandbox mode, both sender and recipient email addresses must be verified. For testing, you can also use the SES mailbox simulator:
+
+```text
+success@simulator.amazonses.com
+```
+
+### 5. Create SNS Topic
+
+Create a standard SNS topic:
 
 ```text
 d-dva-sns-notification
 ```
 
-Sau đó tạo subscription:
+Then create an email subscription for the admin email address. The subscription must be confirmed from the email inbox.
 
-- Protocol: `Email`
-- Endpoint: email admin
+### 6. Create SQS Queue
 
-Admin cần confirm subscription qua email.
-
-### 6. Tạo SQS
-
-Tạo standard queue:
+Create a standard SQS queue:
 
 ```text
 d-dva-sqs-email
 ```
 
-### 7. Tạo Lambda Registration
+### 7. Create Registration Lambda
 
-Tạo Lambda:
+Create a Lambda function:
 
-- Function name: `d-dva-lambda-registration`
-- Runtime: Python 3.13
-- Architecture: x86_64
-- Role: `d-dva-role-for-lambda-registration`
+```text
+Function name: d-dva-lambda-registration
+Runtime: Python 3.13
+Architecture: x86_64
+IAM role: d-dva-role-for-lambda-registration
+```
 
-Thêm environment variables:
+Set environment variables:
 
 ```text
 TABLE_NAME=d-dva-ddb-registration
@@ -205,18 +220,20 @@ CORS_ORIGIN=*
 LOG_LEVEL=INFO
 ```
 
-Deploy code xử lý submit form, validate input, ghi DynamoDB và gửi message vào SQS.
+Deploy the Lambda code that validates the request, writes to DynamoDB, and sends a message to SQS.
 
-### 8. Tạo Lambda Email Sender
+### 8. Create Email Sender Lambda
 
-Tạo Lambda:
+Create a Lambda function:
 
-- Function name: `d-dva-lambda-sender`
-- Runtime: Python 3.13
-- Architecture: x86_64
-- Role: `d-dva-role-for-lambda-sender`
+```text
+Function name: d-dva-lambda-sender
+Runtime: Python 3.13
+Architecture: x86_64
+IAM role: d-dva-role-for-lambda-sender
+```
 
-Thêm environment variables:
+Set environment variables:
 
 ```text
 TABLE_NAME=d-dva-ddb-registration
@@ -225,70 +242,66 @@ SES_SENDER=DVA Registration <no-reply@yourdomain.com>
 LOG_LEVEL=INFO
 ```
 
-Thêm trigger từ SQS queue `d-dva-sqs-email`.
+Add the SQS queue `d-dva-sqs-email` as a trigger.
 
-### 9. Tạo API Gateway
+### 9. Create API Gateway
 
-Tạo REST API:
+Create a REST API:
 
-- API name: `d-dva-apigw-registration`
-- Endpoint type: Regional
-- Resource: `/register`
-- Method: `POST`
-- Integration type: Lambda function
-- Lambda proxy integration: enabled
-- Lambda function: `d-dva-lambda-registration`
+```text
+API name: d-dva-apigw-registration
+Resource: /register
+Method: POST
+Integration type: Lambda function
+Lambda proxy integration: enabled
+Lambda function: d-dva-lambda-registration
+Stage: dev
+```
 
-Enable CORS cho resource `/register`, sau đó deploy API với stage `dev`.
+Enable CORS for the `/register` resource and deploy the API.
 
-### 10. Tạo Frontend Repository
+### 10. Deploy Frontend with Amplify
 
-Tạo GitHub repository:
+Create a GitHub repository for the frontend:
 
 ```text
 dva-serverless-project-frontend
 ```
 
-Thêm file `index.html` chứa form đăng ký. Trong file frontend, dùng placeholder:
+The frontend should contain a placeholder for the API endpoint:
 
 ```js
 const API_URL = "%%API_URL%%";
 ```
 
-Placeholder này sẽ được thay bằng API Gateway endpoint khi build trên Amplify.
-
-### 11. Deploy Frontend Bằng Amplify
-
-Kết nối Amplify với GitHub repository, chọn branch `master`, sau đó cấu hình build settings:
+Use this `amplify.yml` file:
 
 ```yml
 version: 1
 frontend:
-    phases:
-        build:
-            commands:
-                - 'sed -i "s|%%API_URL%%|$API_URL|g" index.html'
-    artifacts:
-        baseDirectory: /
-        files:
-            - '**/*'
-    cache:
-        paths: []
+  phases:
+    build:
+      commands:
+        - 'sed -i "s|%%API_URL%%|$API_URL|g" index.html'
+  artifacts:
+    baseDirectory: /
+    files:
+      - '**/*'
+  cache:
+    paths: []
 ```
 
-Thêm environment variable trong Amplify:
+Add the Amplify environment variable:
 
 ```text
-API_URL=<API_GATEWAY_ENDPOINT>/register
+API_URL=<API_GATEWAY_INVOKE_URL>/register
 ```
 
-Sau đó review và deploy.
+Then review and deploy the Amplify app.
 
-## Test
+## API Test
 
-### Test API Gateway
-
-Gửi request mẫu:
+Example request body:
 
 ```json
 {
@@ -298,53 +311,72 @@ Gửi request mẫu:
 }
 ```
 
-Kết quả mong đợi:
+Expected result:
 
-- API trả về `200`.
-- Response có registration `id`.
-- DynamoDB có item mới với status `QUEUED` hoặc `SENT`.
-- User nhận email xác nhận từ SES.
-- Admin nhận notification từ SNS.
+- API Gateway returns HTTP `200`.
+- Response contains a registration ID.
+- DynamoDB contains a new registration item.
+- SQS receives and processes the message.
+- The user receives a confirmation email from SES.
+- The admin receives a notification from SNS.
+- DynamoDB status is updated to `SENT`.
 
-### Test Frontend
+## Demo Checklist
 
-1. Mở URL Amplify sau khi deploy.
-2. Nhập first name, last name và email đã verify trong SES.
-3. Submit form.
-4. Kiểm tra message thành công trên giao diện.
-5. Kiểm tra email user, email admin và DynamoDB table.
+For a stronger GitHub portfolio demo, include screenshots under `docs/screenshots/`:
+
+- Frontend registration form.
+- Successful frontend submission.
+- API Gateway `/register` endpoint.
+- DynamoDB item after submission.
+- SQS trigger attached to the Email Sender Lambda.
+- SES confirmation email.
+- SNS admin notification email.
+- CloudWatch logs for both Lambda functions.
 
 ## Troubleshooting
 
-| Vấn đề | Cách kiểm tra |
+| Issue | What to Check |
 |---|---|
-| API bị CORS | Kiểm tra CORS ở API Gateway và `CORS_ORIGIN` trong Lambda |
-| Không nhận email SES | Kiểm tra SES identity, Sandbox mode và email recipient đã verify chưa |
-| SNS không gửi email | Kiểm tra subscription đã confirm chưa |
-| Lambda Registration lỗi | Kiểm tra `TABLE_NAME`, `QUEUE_URL`, IAM permission và CloudWatch Logs |
-| Lambda Sender không chạy | Kiểm tra SQS trigger, IAM permission và CloudWatch Logs |
-| Frontend gọi sai API | Kiểm tra biến `API_URL` trong Amplify |
+| CORS error from frontend | API Gateway CORS settings and `CORS_ORIGIN` |
+| SES email not received | SES identity verification and Sandbox mode |
+| SNS email not received | SNS subscription confirmation |
+| Registration Lambda fails | `TABLE_NAME`, `QUEUE_URL`, IAM permissions, CloudWatch Logs |
+| Sender Lambda does not run | SQS trigger, IAM permissions, CloudWatch Logs |
+| Frontend calls wrong endpoint | Amplify `API_URL` environment variable |
+| DynamoDB status is not updated | Sender Lambda logs and `dynamodb:UpdateItem` permission |
 
 ## Cleanup
 
-Xóa resource theo thứ tự sau để tránh sót dependency:
+Delete resources in this order to avoid dependency issues and unnecessary costs:
 
 1. Amplify app
 2. GitHub repository
 3. API Gateway
-4. Lambda Email Sender
-5. Lambda Registration
+4. Email Sender Lambda
+5. Registration Lambda
 6. SQS queue
-7. SNS topic và subscription
-8. SES identity
+7. SNS topic and subscriptions
+8. SES identities
 9. DynamoDB table
-10. IAM roles và policies
+10. IAM roles and policies
 
-## Lưu Ý Bảo Mật
+## Security Notes
 
-- Không commit AWS credentials vào repository.
-- Không dùng `CORS_ORIGIN=*` cho production.
-- IAM policy nên giới hạn đúng resource ARN thay vì cấp quyền rộng.
-- SES sender domain nên được verify đầy đủ với DKIM/SPF.
-- Với production, nên thêm DLQ, monitoring, alarm và retry policy rõ ràng.
+- Do not commit AWS credentials to the repository.
+- Do not expose real AWS account IDs or private endpoints in public screenshots.
+- Avoid using `CORS_ORIGIN=*` in production.
+- Use least-privilege IAM policies.
+- Verify SES domain identity with proper DKIM/SPF configuration.
+- Use CloudWatch Logs for debugging and auditing.
+
+## Future Improvements
+
+- Convert manual AWS Console steps to Infrastructure as Code with AWS SAM, CDK, or Terraform.
+- Add a dead-letter queue for failed email processing.
+- Add CloudWatch alarms for Lambda errors and SQS queue depth.
+- Add request schema validation at API Gateway.
+- Add custom domain support for the frontend and API.
+- Add CI/CD deployment for Lambda and frontend updates.
+- Add unit tests for Lambda validation logic.
 

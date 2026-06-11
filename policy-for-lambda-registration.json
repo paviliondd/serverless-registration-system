@@ -1,0 +1,33 @@
+{
+    Version 2012-10-17,
+    Statement [
+        {
+            Sid WriteToDynamoDB,
+            Effect Allow,
+            Action [
+                dynamodbPutItem
+            ],
+            Resource arnawsdynamodbus-east-1070648356880tabled-dva-ddb-registration
+        },
+        {
+            Sid SendToSQS,
+            Effect Allow,
+            Action [
+                sqsSendMessage
+            ],
+            Resource arnawssqsus-east-1070648356880d-dva-sqs-email
+        },
+        {
+            Sid CloudWatchLogsMinimal,
+            Effect Allow,
+            Action [
+                logsCreateLogGroup,
+                logsCreateLogStream,
+                logsPutLogEvents
+            ],
+            Resource [
+                arnawslogs
+            ]
+        }
+    ]
+}

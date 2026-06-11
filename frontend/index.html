@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Event Registration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; background:#0b1020; color:#e9edf5; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    .wrap { max-width:980px; margin:48px auto; padding:0 24px; }
+    .card { background:#0f1b33; border:1px solid #1d2a4d; border-radius:16px; padding:28px; box-shadow:0 6px 30px rgba(0,0,0,.35); }
+    h1 { margin:0 0 12px; font-size:28px; font-weight:800; }
+    .muted { color:#b6c2df; margin-bottom:18px; }
+    label { display:block; font-weight:700; margin:16px 0 8px; }
+    .req { color:#ff5a7a; margin-left:4px; }
+    input { width:100%; background:#0a1429; color:#eef3ff; border:1px solid #223055; border-radius:8px; padding:12px 14px; outline:0; transition:border .15s; }
+    input:focus { border-color:#6ea8ff; box-shadow:0 0 0 3px rgba(110,168,255,.2); }
+    input.err { border-color:#e66; box-shadow:0 0 0 3px rgba(230,102,102,.15); }
+    .counter { font-size:12px; color:#8ea0c9; margin-top:6px; }
+    .errText { color:#ffb8c7; font-size:12px; margin-top:6px; }
+    .btn { margin-top:18px; background:linear-gradient(90deg,#6a5cff,#7f38ff); border:none; color:#fff; padding:12px 18px; font-weight:700; border-radius:10px; cursor:pointer; }
+    .btn[disabled]{opacity:.6; cursor:not-allowed;}
+    .alert { margin-top:16px; padding:12px 14px; border-radius:8px; }
+    .ok { background:#10361f; color:#b8f5cf; border:1px solid #1e6d3d; }
+    .err { background:#3a1520; color:#ffd2df; border:1px solid #7b2c41; }
+    .note { margin-top:22px; line-height:1.6; color:#cbd6f3; }
+    a { color:#8ab4ff; text-decoration:none; } a:hover{text-decoration:underline;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Contact information</h1>
+      <p class="muted">
+        This name will be printed on your badge. Your legal name, if different, can be provided in the event profile.
+      </p>
+
+      <form id="form" novalidate>
+        <label>First name <span class="req">*</span></label>
+        <input id="first" maxlength="100" aria-required="true" />
+        <div class="counter" id="c-first">0/100</div>
+        <div class="errText" id="e-first" hidden></div>
+
+        <label>Last name <span class="req">*</span></label>
+        <input id="last" maxlength="100" aria-required="true" />
+        <div class="counter" id="c-last">0/100</div>
+        <div class="errText" id="e-last" hidden></div>
+
+        <label>Email <span class="req">*</span></label>
+        <input id="email" type="email" maxlength="254" aria-required="true" />
+        <div class="counter" id="c-email">0/254</div>
+        <div class="errText" id="e-email" hidden></div>
+
+        <button class="btn" id="submit" type="submit">Continue</button>
+
+        <div id="alert-ok" class="alert ok" hidden></div>
+        <div id="alert-err" class="alert err" hidden></div>
+      </form>
+
+      <div class="note">
+        <h3 style="margin:18px 0 8px">AWS Event Terms</h3>
+        <p>
+          AWS takes reports of misconduct seriously and encourages event participants to report disruptive or otherwise unsafe behavior.
+          Attendees who do not comply with the <a href="https://aws.amazon.com/codeofconduct/" target="_blank" rel="noreferrer">AWS Code of Conduct</a> may be required to leave all event venues and will be banned from future participation.
+        </p>
+        <p>
+          By clicking Continue, you agree to the AWS Event Terms &amp; Conditions and the AWS Code of Conduct. Your information will be handled in accordance with the AWS Privacy Notice.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "%%API_URL%%";
+
+    const NAME_MAX = 100, EMAIL_MAX = 254;
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const $ = (id) => document.getElementById(id);
+    const first = $("first"), last = $("last"), email = $("email");
+    const cFirst = $("c-first"), cLast = $("c-last"), cEmail = $("c-email");
+    const eFirst = $("e-first"), eLast = $("e-last"), eEmail = $("e-email");
+    const btn = $("submit"), ok = $("alert-ok"), err = $("alert-err");
+
+    function setErr(input, el, msg) {
+      if (msg) { input.classList.add("err"); el.textContent = msg; el.hidden = false; }
+      else { input.classList.remove("err"); el.hidden = true; el.textContent = ""; }
+    }
+
+    function count(el, counter, max) {
+      const n = el.value.trim().length;
+      counter.textContent = `${n}/${max}`;
+    }
+
+    function validate() {
+      const f = first.value.trim();
+      const l = last.value.trim();
+      const m = email.value.trim();
+
+      let ok = true;
+
+      // first_name
+      if (!f) { setErr(first, eFirst, "First name is required"); ok = false; }
+      else if (f.length > NAME_MAX) { setErr(first, eFirst, `Max ${NAME_MAX} characters`); ok = false; }
+      else setErr(first, eFirst, "");
+
+      // last_name
+      if (!l) { setErr(last, eLast, "Last name is required"); ok = false; }
+      else if (l.length > NAME_MAX) { setErr(last, eLast, `Max ${NAME_MAX} characters`); ok = false; }
+      else setErr(last, eLast, "");
+
+      // email
+      if (!m) { setErr(email, eEmail, "Email is required"); ok = false; }
+      else if (m.length > EMAIL_MAX) { setErr(email, eEmail, `Max ${EMAIL_MAX} characters`); ok = false; }
+      else if (!emailRe.test(m)) { setErr(email, eEmail, "Email format is invalid"); ok = false; }
+      else setErr(email, eEmail, "");
+
+      return ok;
+    }
+
+    ["input","blur"].forEach(ev => {
+      first.addEventListener(ev, () => count(first, cFirst, NAME_MAX));
+      last.addEventListener(ev,  () => count(last,  cLast,  NAME_MAX));
+      email.addEventListener(ev, () => count(email, cEmail, EMAIL_MAX));
+    });
+    count(first, cFirst, NAME_MAX);
+    count(last,  cLast,  NAME_MAX);
+    count(email, cEmail, EMAIL_MAX);
+
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      ok.hidden = true; ok.textContent = "";
+      err.hidden = true; err.textContent = "";
+
+      if (!validate()) return;
+
+      btn.disabled = true; btn.textContent = "Submitting…";
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            first_name: first.value.trim(),
+            last_name:  last.value.trim(),
+            email:      email.value.trim().toLowerCase()
+          })
+        });
+
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(`API ${res.status}: ${t || "request failed"}`);
+        }
+
+        const data = await res.json().catch(() => ({}));
+        ok.textContent = `Thanks! Your registration id is ${data.id || "(created)"}.Please check your email!!`;
+        ok.hidden = false;
+
+        first.value = ""; last.value = ""; email.value = "";
+        [first,last,email].forEach((el)=>el.classList.remove("err"));
+        [cFirst,cLast,cEmail].forEach((c)=>c.textContent="0/0"); // will reset by count()
+        count(first, cFirst, NAME_MAX); count(last, cLast, NAME_MAX); count(email, cEmail, EMAIL_MAX);
+      } catch (ex) {
+        err.textContent = ex.message || "Submit failed";
+        err.hidden = false;
+      } finally {
+        btn.disabled = false; btn.textContent = "Continue";
+      }
+    });
+  </script>
+</body>
+</html>

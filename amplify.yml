@@ -1,0 +1,12 @@
+version: 1
+frontend:
+    phases:
+        build:
+            commands:
+                - 'sed -i "s|%%API_URL%%|$API_URL|g" index.html'
+    artifacts:
+        baseDirectory: /
+        files:
+            - '**/*'
+    cache:
+        paths: []
